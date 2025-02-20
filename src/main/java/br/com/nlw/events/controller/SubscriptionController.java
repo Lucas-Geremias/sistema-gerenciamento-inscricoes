@@ -7,10 +7,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import br.com.nlw.events.model.Subscription;
+import br.com.nlw.events.dto.ErrorMessage;
+import br.com.nlw.events.dto.SubscriptionResponse;
+import br.com.nlw.events.exception.EventNotFoundException;
+import br.com.nlw.events.exception.SubscriptionConflictException;
+import br.com.nlw.events.exception.UserIndicadorNotfoundException;
 import br.com.nlw.events.model.User;
 import br.com.nlw.events.service.SubscriptionService;
-
 
 @RestController
 public class SubscriptionController {
@@ -18,14 +21,25 @@ public class SubscriptionController {
   @Autowired
   private SubscriptionService service;
 
-  @PostMapping("/subscription/{prettyName}")
-  public ResponseEntity<Subscription> ereateSubscription(@PathVariable String prettyName, @RequestBody User subsCriber) {
-      Subscription res = service.createNewSubscription(prettyName, subsCriber);
-      if (res != null){
+  @PostMapping({"/subscription/{prettyName}", "/subscription/{prettyName}/{userId}"})
+  public ResponseEntity<?> createSubscription(@PathVariable String prettyName,
+      @RequestBody User subscriber, @PathVariable(required=false) Integer userId) {
+    try {
+      SubscriptionResponse res = service.createNewSubscription(prettyName, subscriber, userId);
+      if (res != null) {
         return ResponseEntity.ok(res);
       }
-      
-      return ResponseEntity.badRequest().build();
+
+    } catch (EventNotFoundException ex) {
+      return ResponseEntity.status(404).body(new ErrorMessage(ex.getMessage()));
+    }
+    catch(SubscriptionConflictException ex){
+      return ResponseEntity.status(409).body(new ErrorMessage(ex.getMessage()));
+    }
+    catch(UserIndicadorNotfoundException ex){
+      return ResponseEntity.status(404).body(new ErrorMessage(ex.getMessage()));
+    }
+    return ResponseEntity.badRequest().build();
+
   }
-  
 }

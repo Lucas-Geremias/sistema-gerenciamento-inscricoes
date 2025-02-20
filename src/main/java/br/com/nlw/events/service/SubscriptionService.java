@@ -3,6 +3,10 @@ package br.com.nlw.events.service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import br.com.nlw.events.dto.SubscriptionResponse;
+import br.com.nlw.events.exception.EventNotFoundException;
+import br.com.nlw.events.exception.SubscriptionConflictException;
+import br.com.nlw.events.exception.UserIndicadorNotfoundException;
 import br.com.nlw.events.model.Event;
 import br.com.nlw.events.model.Subscription;
 import br.com.nlw.events.model.User;
@@ -22,16 +26,34 @@ public class SubscriptionService {
     @Autowired
     private SubscriptionRepo subRepo;
 
-    public Subscription createNewSubscription(String eventName, User user){
+    public SubscriptionResponse createNewSubscription(String eventName, User user, Integer userId){
 
       Event evt = evtRepo.findByPrettyName(eventName);
-      user = userRepo.save(user);
+      if(evt == null){
+        throw new EventNotFoundException("Evento "+eventName+" não existe");
+      }
+      User userRec = userRepo.findByEmail(user.getEmail());
+      if (userRec == null){
+        userRec = userRepo.save(user);
+      }
+
+      User indicador = userRepo.findById(userId).orElse(null);
+      if(indicador == null){
+        throw new UserIndicadorNotfoundException("Usuário"+userId+" indicador não existe");
+      }
+
 
       Subscription subs = new Subscription();
       subs.setEvent(evt);
       subs.setSubscriber(user);
+      subs.setIndication(indicador);
+
+      Subscription tmpSub = subRepo.findByEventAndSubscriber(evt, userRec);
+      if(tmpSub != null){
+        throw new SubscriptionConflictException("Já existe inscrição para o usuário "+userRec.getName()+ " no evento "+evt.getTitle());
+      }
 
       Subscription res = subRepo.save(subs);
-      return res;
+      return new SubscriptionResponse( res.getSubscriptionNumber(), "http://codecraft.com/subscription/"+res.getEvent().getPrettyName()+"/"+res.getSubscriber().getId());
     }
 }
